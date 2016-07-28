@@ -24,28 +24,23 @@ db.update = (collection) => {
     res.on('end', () => {
       stream.end()
 
-      mongoose.connection.db.collection(collection).remove(function(e, count) {
-        if (e) {
-          return winston.warn(`Could not import ${collection} to MongoDB.`, e)
+      let shell = childProcess.spawn('mongoimport', [
+        '-d', mongoose.connection.name,
+        '-c', collection,
+        '--host', mongoose.connection.host,
+        '--port', mongoose.connection.port,
+        '--file', filePath,
+      ])
+
+      shell.on('close', code => {
+        if (code == 0) {
+          winston.info(`Synced ${collection}.`)
+        } else {
+          winston.warn(`Could not import ${collection} to MongoDB. \
+            The 'mongoexport' command left us with exit code ${code}.`)
         }
-
-        let shell = childProcess.spawn('mongoimport', [
-          '-d', mongoose.connection.name,
-          '-c', collection,
-          '--host', mongoose.connection.host,
-          '--port', mongoose.connection.port,
-          '--file', filePath
-        ])
-
-        shell.on('close', code => {
-          if (code == 0) {
-            winston.info(`Synced ${collection}.`)
-          } else {
-            winston.warn(`Could not import ${collection} to MongoDB. \
-              The 'mongoexport' command left us with exit code ${code}.`)
-          }
-        })
       })
+
     })
 
   }).on('error', e => {
